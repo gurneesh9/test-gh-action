@@ -14,7 +14,7 @@ jobs:
         env:
           APP_ID: 1033286
           INSTALLATION_ID: 56284975
-          APP_PRIVATE_KEY: ${{ secrets.GITHUB_APP_PRIVATE_KEY }}
+          APP_PRIVATE_KEY: ${{ secrets.APP_PRIVATE_KEY }}
         run: |
           # Create a temporary file for the private key
           echo "$APP_PRIVATE_KEY" > private_key.pem
