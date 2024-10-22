@@ -12,12 +12,12 @@ jobs:
       - name: Generate JWT and Installation Token
         id: generate_token
         env:
-          APP_ID: ${{ secrets.GITHUB_APP_ID }}
-          INSTALLATION_ID: ${{ secrets.GITHUB_INSTALLATION_ID }}
+          APP_ID: 1033286
+          INSTALLATION_ID: 56284975
           APP_PRIVATE_KEY: ${{ secrets.GITHUB_APP_PRIVATE_KEY }}
         run: |
           # Create a temporary file for the private key
-          # echo "$APP_PRIVATE_KEY" > private_key.pem
+          echo "$APP_PRIVATE_KEY" > private_key.pem
           cat private_key-pkcs8.pem
 
           # Get the current time and expiration time
@@ -29,7 +29,7 @@ jobs:
           PAYLOAD=$(echo -n "{\"iat\":$ISSUED_AT,\"exp\":$EXPIRATION,\"iss\":$APP_ID}" | base64 -w0 | tr '+/' '-_' | tr -d '=')
 
           # Generate signature
-          SIGNATURE=$(echo -n "$HEADER.$PAYLOAD" | openssl dgst -sha256 -sign private_key-pkcs8.pem | base64 -w0 | tr '+/' '-_' | tr -d '=')
+          SIGNATURE=$(echo -n "$HEADER.$PAYLOAD" | openssl dgst -sha256 -sign private_key.pem | base64 -w0 | tr '+/' '-_' | tr -d '=')
 
           # Combine JWT
           JWT="$HEADER.$PAYLOAD.$SIGNATURE"
