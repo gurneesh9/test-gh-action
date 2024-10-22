@@ -22,6 +22,7 @@ jobs:
       # 2. Save the private key from secrets to a file
       - name: Set up private key
         run: |
+          cat private_key.pem
           echo "PRIVATE_KEY: ${{ secrets.APP_PRIVATE_KEY }}"
           echo "${{ secrets.APP_PRIVATE_KEY }}" > private-key-pkcs8.pem
 
@@ -34,7 +35,7 @@ jobs:
 
           HEADER=$(echo -n '{"alg":"RS256","typ":"JWT"}' | openssl base64 -e -A | tr '+/' '-_' | tr -d '=')
           PAYLOAD=$(echo -n "{\"iat\":$ISSUED_AT,\"exp\":$EXPIRATION,\"iss\":$APP_ID}" | openssl base64 -e -A | tr '+/' '-_' | tr -d '=')
-          SIGNATURE=$(echo -n "$HEADER.$PAYLOAD" | openssl dgst -sha256 -sign private-key-pkcs8.pem | openssl base64 -e -A | tr '+/' '-_' | tr -d '=')
+          SIGNATURE=$(echo -n "$HEADER.$PAYLOAD" | openssl dgst -sha256 -sign private_key.pem | openssl base64 -e -A | tr '+/' '-_' | tr -d '=')
 
           JWT="$HEADER.$PAYLOAD.$SIGNATURE"
           echo "Generated JWT: $JWT"
