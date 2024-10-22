@@ -6,65 +6,62 @@ on:
       - main
 
 jobs:
-  generate-github-token:
+  generate-token:
     runs-on: ubuntu-latest
-
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v3
-
-      # 1. Set the GitHub App variables (replace with actual values)
-      - name: Set GitHub App Variables
+      - name: Generate JWT and Installation Token
+        id: generate_token
+        env:
+          APP_ID: ${{ secrets.GITHUB_APP_ID }}
+          INSTALLATION_ID: ${{ secrets.GITHUB_INSTALLATION_ID }}
+          APP_PRIVATE_KEY: ${{ secrets.GITHUB_APP_PRIVATE_KEY }}
         run: |
-          APP_ID=1033286
-          INSTALLATION_ID=56284975
+          # Create a temporary file for the private key
+          # echo "$APP_PRIVATE_KEY" > private_key.pem
 
-      # # 2. Convert the PEM private key to PKCS8 and save it
-      # - name: Set up private key
-      #   run: |
-      #     cat private_key.pem
-      #     openssl pkcs8 -topk8 -inform PEM -outform PEM -nocrypt -in private_key.pem -out private_key-pkcs8.pem
-
-      # 3. Generate JWT for GitHub App Authentication
-      - name: Create GitHub App Token
-        id: generate_jwt
-        run: |
-          # Get the issued time and expiration time (max 10 minutes)
+          # Get the current time and expiration time
           ISSUED_AT=$(date +%s)
           EXPIRATION=$(($ISSUED_AT + 600))
 
-          # Base64 URL encode the header and payload
-          HEADER=$(echo -n '{"alg":"RS256","typ":"JWT"}' | openssl base64 -e -A | tr '+/' '-_' | tr -d '=')
-          PAYLOAD=$(echo -n "{\"iat\":$ISSUED_AT,\"exp\":$EXPIRATION,\"iss\":$APP_ID}" | openssl base64 -e -A | tr '+/' '-_' | tr -d '=')
+          # Create JWT header and payload
+          HEADER=$(echo -n '{"alg":"RS256","typ":"JWT"}' | base64 -w0 | tr '+/' '-_' | tr -d '=')
+          PAYLOAD=$(echo -n "{\"iat\":$ISSUED_AT,\"exp\":$EXPIRATION,\"iss\":$APP_ID}" | base64 -w0 | tr '+/' '-_' | tr -d '=')
 
-          # Sign the JWT using the private key
-          SIGNATURE=$(echo -n "$HEADER.$PAYLOAD" | openssl dgst -sha256 -sign private_key-pkcs8.pem | openssl base64 -e -A | tr '+/' '-_' | tr -d '=')
+          # Generate signature
+          SIGNATURE=$(echo -n "$HEADER.$PAYLOAD" | openssl dgst -sha256 -sign private_key-pkcs8.pem | base64 -w0 | tr '+/' '-_' | tr -d '=')
 
-          # Combine header, payload, and signature to form the JWT
+          # Combine JWT
           JWT="$HEADER.$PAYLOAD.$SIGNATURE"
-          echo "Generated JWT: $JWT"
 
-          # Export the JWT as an environment variable
-          echo "JWT=$JWT" >> $GITHUB_ENV
-
-      # 4. Use the JWT to get an installation token via curl
-      - name: Get GitHub App Installation Token
-        id: get_installation_token
-        run: |
-          TOKEN_RESPONSE=$(curl -X POST \
-            -H "Authorization: Bearer ${{ env.JWT }}" \
+          # Get installation token
+          TOKEN_RESPONSE=$(curl -s -X POST \
+            -H "Authorization: Bearer $JWT" \
             -H "Accept: application/vnd.github+json" \
-            https://api.github.com/app/installations/$INSTALLATION_ID/access_tokens)
+            "https://api.github.com/app/installations/$INSTALLATION_ID/access_tokens")
 
-          echo "TOKEN RESP: ${TOKEN_RESPONSE}"
+          echo "Token Response: ${TOKEN_RESPONSE}"
 
-          INSTALLATION_TOKEN=$(echo $TOKEN_RESPONSE | jq -r .token)
-          echo "Installation Token: $INSTALLATION_TOKEN"
+          # Extract token using grep and cut since jq isn't installed by default
+          INSTALLATION_TOKEN=$(echo "$TOKEN_RESPONSE" | grep -o '"token":"[^"]*' | cut -d'"' -f4)
 
-          echo "INSTALLATION_TOKEN=$INSTALLATION_TOKEN" >> $GITHUB_ENV
+          echo "INSTALLATION TOKEN: ${INSTALLATION_TOKEN}"
 
-      - name: Test GitHub API with App Token
-        run: |
-          curl -H "Authorization: Bearer ${{ env.INSTALLATION_TOKEN }}" \
-            -H "Accept: application/vnd.github+json" \
-            https://api.github.com/repos/test-gh-action/actions/workflows
+          # Remove private key file
+          # rm private_key.pem
+
+          # Set output
+          echo "token=$INSTALLATION_TOKEN" >> $GITHUB_OUTPUT
+
+          # Mask the token in logs
+          echo "::add-mask::$INSTALLATION_TOKEN"
+
+          echo "Token generated successfully!"
+
+      # Optional: Test the token (uncomment and modify as needed)
+      # - name: Test GitHub API Request
+      #   env:
+      #     INSTALLATION_TOKEN: ${{ steps.generate_token.outputs.token }}
+      #   run: |
+      #     curl -H "Authorization: Bearer $INSTALLATION_TOKEN" \
+      #          -H "Accept: application/vnd.github+json" \
+      #          https://api.github.com/repos/OWNER/REPO/actions/workflows
