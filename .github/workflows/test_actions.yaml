@@ -22,7 +22,7 @@ jobs:
       # 2. Convert the PEM private key to PKCS8 and save it
       - name: Set up private key
         run: |
-          echo "${{ secrets.APP_PRIVATE_KEY }}" > private_key.pem
+          cat private_key.pem
           openssl pkcs8 -topk8 -inform PEM -outform PEM -nocrypt -in private_key.pem -out private_key-pkcs8.pem
 
       # 3. Generate JWT for GitHub App Authentication
