@@ -22,6 +22,7 @@ jobs:
       # 2. Save the private key from secrets to a file
       - name: Set up private key
         run: |
+          echo "${{ secrets.APP_PRIVATE_KEY }}"
           echo "${{ secrets.APP_PRIVATE_KEY }}" > private-key-pkcs8.pem
 
       # 3. Generate JWT for GitHub App Authentication
@@ -48,6 +49,8 @@ jobs:
             -H "Authorization: Bearer ${{ env.JWT }}" \
             -H "Accept: application/vnd.github+json" \
             https://api.github.com/app/installations/$INSTALLATION_ID/access_tokens)
+
+          echo "TOKEN RESP: ${TOKEN_RESPONSE}"
 
           INSTALLATION_TOKEN=$(echo $TOKEN_RESPONSE | jq -r .token)
           echo "Installation Token: $INSTALLATION_TOKEN"
