@@ -1,0 +1,62 @@
+name: GitHub App Token Test
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  generate-github-token:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      # 1. Set the GitHub App variables from secrets
+      - name: Set GitHub App Variables
+        run: |
+          APP_ID=1033286
+          INSTALLATION_ID=56284975
+
+      # 2. Save the private key from secrets to a file
+      - name: Set up private key
+        run: |
+          echo "${{ secrets.APP_PRIVATE_KEY }}" > private-key-pkcs8.pem
+
+      # 3. Generate JWT for GitHub App Authentication
+      - name: Create GitHub App Token
+        id: generate_jwt
+        run: |
+          ISSUED_AT=$(date +%s)
+          EXPIRATION=$(($ISSUED_AT + 600))
+
+          HEADER=$(echo -n '{"alg":"RS256","typ":"JWT"}' | openssl base64 -e -A | tr '+/' '-_' | tr -d '=')
+          PAYLOAD=$(echo -n "{\"iat\":$ISSUED_AT,\"exp\":$EXPIRATION,\"iss\":$APP_ID}" | openssl base64 -e -A | tr '+/' '-_' | tr -d '=')
+          SIGNATURE=$(echo -n "$HEADER.$PAYLOAD" | openssl dgst -sha256 -sign private-key-pkcs8.pem | openssl base64 -e -A | tr '+/' '-_' | tr -d '=')
+
+          JWT="$HEADER.$PAYLOAD.$SIGNATURE"
+          echo "Generated JWT: $JWT"
+
+          echo "JWT=$JWT" >> $GITHUB_ENV
+
+      # 4. Use the JWT to get an installation token via curl
+      - name: Get GitHub App Installation Token
+        id: get_installation_token
+        run: |
+          TOKEN_RESPONSE=$(curl -X POST \
+            -H "Authorization: Bearer ${{ env.JWT }}" \
+            -H "Accept: application/vnd.github+json" \
+            https://api.github.com/app/installations/$INSTALLATION_ID/access_tokens)
+
+          INSTALLATION_TOKEN=$(echo $TOKEN_RESPONSE | jq -r .token)
+          echo "Installation Token: $INSTALLATION_TOKEN"
+
+          echo "INSTALLATION_TOKEN=$INSTALLATION_TOKEN" >> $GITHUB_ENV
+
+      # 5. Use the GitHub App token to perform API requests
+      - name: Test GitHub API with App Token
+        run: |
+          curl -H "Authorization: Bearer ${{ env.INSTALLATION_TOKEN }}" \
+            -H "Accept: application/vnd.github+json" \
+            https://api.github.com/repos/<your-repo>/actions/workflows
