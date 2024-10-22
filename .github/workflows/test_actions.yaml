@@ -18,7 +18,7 @@ jobs:
         run: |
           # Create a temporary file for the private key
           echo "$APP_PRIVATE_KEY" > private_key.pem
-          cat private_key-pkcs8.pem
+          cat private_key.pem
 
           # Get the current time and expiration time
           ISSUED_AT=$(date +%s)
